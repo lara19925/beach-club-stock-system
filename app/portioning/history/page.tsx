@@ -1,72 +1,123 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
 
-interface SavedSheet {
-  date: string
-  item: string
-  preparedBy: string
-  checkedBy: string
-  netUsableWeight: number
-  variance: number
-}
-
-export default function PortioningHistoryPage() {
-  const [savedSheets, setSavedSheets] = useState<SavedSheet[]>([])
+export default function PortionHistoryPage() {
+  const [sheets, setSheets] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const saved = localStorage.getItem('portionSheets')
-    if (saved) {
-      setSavedSheets(JSON.parse(saved))
-    }
+    fetchSheets()
   }, [])
 
-  const deleteSavedSheet = (index: number) => {
-    const updated = savedSheets.filter((_, i) => i !== index)
-    setSavedSheets(updated)
-    localStorage.setItem('portionSheets', JSON.stringify(updated))
+  const fetchSheets = async () => {
+    const { data, error } = await supabase
+      .from('portion_sheets')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (!error && data) {
+      setSheets(data)
+    }
+
+    setLoading(false)
   }
 
-  const styles = {
-    container: { backgroundColor: '#f5f5f5', minHeight: '100vh', padding: '20px' },
-    card: { backgroundColor: 'white', padding: '20px', margin: '10px 0', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' },
-    heading: { color: '#333', marginBottom: '10px', fontSize: '24px' },
-    table: { width: '100%', borderCollapse: 'collapse' as const },
-    th: { backgroundColor: '#f0f0f0', padding: '10px', textAlign: 'left' as const, border: '1px solid #ddd' },
-    td: { padding: '10px', border: '1px solid #ddd' },
-    deleteButton: { backgroundColor: 'red', color: 'white', padding: '5px 10px', border: 'none', borderRadius: '4px', cursor: 'pointer' }
+  const styles: any = {
+    container: {
+      padding: 30,
+      background: '#f5f5f5',
+      minHeight: '100vh',
+    },
+    title: {
+      fontSize: 42,
+      fontWeight: 800,
+      marginBottom: 20,
+    },
+    card: {
+      background: '#fff',
+      padding: 20,
+      borderRadius: 10,
+      overflowX: 'auto',
+    },
+    table: {
+      width: '100%',
+      borderCollapse: 'collapse',
+    },
+    th: {
+      background: '#eee',
+      padding: 12,
+      textAlign: 'left',
+      border: '1px solid #ccc',
+    },
+    td: {
+      padding: 12,
+      border: '1px solid #ccc',
+    },
+    button: {
+      background: 'orange',
+      color: '#fff',
+      padding: '10px 14px',
+      borderRadius: 6,
+      textDecoration: 'none',
+      display: 'inline-block',
+      marginBottom: 20,
+      fontWeight: 700,
+    },
   }
 
   return (
     <div style={styles.container}>
-      <h1 style={styles.heading}>Portion Sheet History</h1>
+      <Link href="/portioning" style={styles.button}>
+        Back to Portioning
+      </Link>
+
+      <h1 style={styles.title}>Portioning History</h1>
+
       <div style={styles.card}>
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.th}>Date</th>
-              <th style={styles.th}>Item</th>
-              <th style={styles.th}>Prepared By</th>
-              <th style={styles.th}>Checked By</th>
-              <th style={styles.th}>Net Usable Weight kg</th>
-              <th style={styles.th}>Variance kg</th>
-              <th style={styles.th}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {savedSheets.map((s, i) => (
-              <tr key={i}>
-                <td style={styles.td}>{s.date}</td>
-                <td style={styles.td}>{s.item}</td>
-                <td style={styles.td}>{s.preparedBy}</td>
-                <td style={styles.td}>{s.checkedBy}</td>
-                <td style={styles.td}>{s.netUsableWeight.toFixed(2)}</td>
-                <td style={styles.td}>{s.variance.toFixed(2)}</td>
-                <td style={styles.td}><button onClick={() => deleteSavedSheet(i)} style={styles.deleteButton}>Delete</button></td>
+        {loading ? (
+          <p>Loading...</p>
+        ) : (
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                <th style={styles.th}>Date</th>
+                <th style={styles.th}>Item</th>
+                <th style={styles.th}>Prepared By</th>
+                <th style={styles.th}>Checked By</th>
+                <th style={styles.th}>Net Usable kg</th>
+                <th style={styles.th}>Shrinkage kg</th>
+                <th style={styles.th}>Variance %</th>
+                <th style={styles.th}>Status</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+
+            <tbody>
+              {sheets.map((sheet) => (
+                <tr key={sheet.id}>
+                  <td style={styles.td}>{sheet.sheet_date}</td>
+                  <td style={styles.td}>{sheet.stock_item}</td>
+                  <td style={styles.td}>{sheet.prepared_by}</td>
+                  <td style={styles.td}>{sheet.checked_by}</td>
+                  <td style={styles.td}>
+                    {Number(sheet.net_usable_weight || 0).toFixed(2)}
+                  </td>
+                  <td style={styles.td}>
+                    {Number(sheet.total_shrinkage_kg || 0).toFixed(2)}
+                  </td>
+                  <td style={styles.td}>
+                    {Number(sheet.true_shortage_percent || 0).toFixed(2)}%
+                  </td>
+                  <td style={styles.td}>
+                    {sheet.variance_status || 'OK'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   )
