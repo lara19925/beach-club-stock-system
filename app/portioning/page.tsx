@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { supabase } from '@/lib/supabase'
-
 type PortionRow = {
   item: string
   portionSize: number
@@ -360,37 +359,38 @@ export default function PortioningPage() {
     )
   }
 
-const saveSheet = async () => {
-  const sheet = {
-    stock_item: stockItem,
-    sheet_date: date,
-    item,
-    prepared_by: preparedBy,
-    checked_by: checkedBy,
-    net_usable_weight: netUsableWeight,
-    total_raw_portion_weight: totalRawPortionWeight,
-    total_cooked_raw_weight_used: totalCookedRawWeightUsed,
-    total_trim_usage: totalTrimUsage,
-    total_accounted_weight: totalAccountedWeight,
-    true_shortage_kg: trueShortageKg,
-    total_shrinkage_kg: totalShrinkageKg,
-    true_shortage_percent: trueShortagePercent,
-    acceptable_variance_percent: acceptableVariancePercent,
-    variance_status: varianceStatus,
-    portion_summary_by_gram_size: portionSummaryByGramSize,
+  const saveSheet = () => {
+    const sheet: SavedSheet = {
+      id: `${Date.now()}`,
+      stockItem,
+      date,
+      item,
+      preparedBy,
+      checkedBy,
+      netUsableWeight,
+      totalRawPortionWeight,
+      totalCookedRawWeightUsed,
+      totalTrimUsage,
+      totalAccountedWeight,
+      trueShortageKg,
+      totalShrinkageKg,
+      trueShortagePercent,
+      acceptableVariancePercent,
+      varianceStatus,
+      portionSummaryByGramSize,
+    }
+
+    const updated = [...savedSheets, sheet]
+    setSavedSheets(updated)
+    localStorage.setItem('portionSheets', JSON.stringify(updated))
+    alert('Portion sheet saved.')
   }
 
-  const { error } = await supabase
-    .from('portion_sheets')
-    .insert([sheet])
-
-  if (error) {
-    alert('Error saving portion sheet: ' + error.message)
-    return
+  const deleteSavedSheet = (id: string) => {
+    const updated = savedSheets.filter(sheet => sheet.id !== id)
+    setSavedSheets(updated)
+    localStorage.setItem('portionSheets', JSON.stringify(updated))
   }
-
-  alert('Portion sheet saved to central history.')
-}
 
   const styles: Record<string, CSSProperties> = {
     page: {
@@ -497,6 +497,10 @@ const saveSheet = async () => {
       <a href="/portioning-summary" style={styles.button}>
         View Portioning Summary
       </a>
+
+      <a href="/portioning/history" style={styles.button}>
+  View Portioning History
+</a>
 
       <h1 style={styles.title}>Portion Control Sheet</h1>
 
@@ -957,7 +961,7 @@ const saveSheet = async () => {
                   {sheet.varianceStatus}
                 </td>
                 <td style={styles.td}>
-                 <button style={styles.delete} onClick={() => alert('Delete from central history page instead.')}>
+                  <button style={styles.delete} onClick={() => deleteSavedSheet(sheet.id)}>
                     Delete
                   </button>
                 </td>
