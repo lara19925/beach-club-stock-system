@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { supabase } from '@/lib/supabase'
 
 type PortionRow = {
   item: string
@@ -359,38 +360,37 @@ export default function PortioningPage() {
     )
   }
 
-  const saveSheet = () => {
-    const sheet: SavedSheet = {
-      id: `${Date.now()}`,
-      stockItem,
-      date,
-      item,
-      preparedBy,
-      checkedBy,
-      netUsableWeight,
-      totalRawPortionWeight,
-      totalCookedRawWeightUsed,
-      totalTrimUsage,
-      totalAccountedWeight,
-      trueShortageKg,
-      totalShrinkageKg,
-      trueShortagePercent,
-      acceptableVariancePercent,
-      varianceStatus,
-      portionSummaryByGramSize,
-    }
-
-    const updated = [...savedSheets, sheet]
-    setSavedSheets(updated)
-    localStorage.setItem('portionSheets', JSON.stringify(updated))
-    alert('Portion sheet saved.')
+const saveSheet = async () => {
+  const sheet = {
+    stock_item: stockItem,
+    sheet_date: date,
+    item,
+    prepared_by: preparedBy,
+    checked_by: checkedBy,
+    net_usable_weight: netUsableWeight,
+    total_raw_portion_weight: totalRawPortionWeight,
+    total_cooked_raw_weight_used: totalCookedRawWeightUsed,
+    total_trim_usage: totalTrimUsage,
+    total_accounted_weight: totalAccountedWeight,
+    true_shortage_kg: trueShortageKg,
+    total_shrinkage_kg: totalShrinkageKg,
+    true_shortage_percent: trueShortagePercent,
+    acceptable_variance_percent: acceptableVariancePercent,
+    variance_status: varianceStatus,
+    portion_summary_by_gram_size: portionSummaryByGramSize,
   }
 
-  const deleteSavedSheet = (id: string) => {
-    const updated = savedSheets.filter(sheet => sheet.id !== id)
-    setSavedSheets(updated)
-    localStorage.setItem('portionSheets', JSON.stringify(updated))
+  const { error } = await supabase
+    .from('portion_sheets')
+    .insert([sheet])
+
+  if (error) {
+    alert('Error saving portion sheet: ' + error.message)
+    return
   }
+
+  alert('Portion sheet saved to central history.')
+}
 
   const styles: Record<string, CSSProperties> = {
     page: {
@@ -957,7 +957,7 @@ export default function PortioningPage() {
                   {sheet.varianceStatus}
                 </td>
                 <td style={styles.td}>
-                  <button style={styles.delete} onClick={() => deleteSavedSheet(sheet.id)}>
+                 <button style={styles.delete} onClick={() => alert('Delete from central history page instead.')}>
                     Delete
                   </button>
                 </td>
