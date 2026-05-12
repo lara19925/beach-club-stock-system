@@ -1,99 +1,103 @@
-'use client';
+'use client'
 
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 
-type PortionSheet = {
-  id: string;
-  sheet_date: string;
-  staff_name: string | null;
-  location: string | null;
-  notes: string | null;
-  total_variance: number | null;
-};
+export default function PortionSheetDetailPage() {
+  const params = useParams()
+  const id = params?.id as string
 
-type PortionLine = {
-  id: string;
-  item_code: string | null;
-  item_name: string | null;
-  opening_qty: number | null;
-  produced_qty: number | null;
-  used_qty: number | null;
-  closing_qty: number | null;
-  expected_qty: number | null;
-  actual_qty: number | null;
-  variance_qty: number | null;
-  variance_value: number | null;
-  issue_note: string | null;
-};
-
-export default function PortionSheetDetailPage({ params }: { params: { id: string } }) {
-  const [sheet, setSheet] = useState<PortionSheet | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [sheet, setSheet] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [errorText, setErrorText] = useState('')
 
   useEffect(() => {
-    loadSheet();
-  }, []);
+    if (id) loadSheet()
+  }, [id])
 
   async function loadSheet() {
-    const { data: sheetData, error: sheetError } = await supabase
+    console.log('OPEN SHEET ID:', id)
+
+    const { data, error } = await supabase
       .from('portion_sheets')
       .select('*')
-      .eq('id', params.id)
-      .single();
+      .eq('id', id)
+      .maybeSingle()
 
-    if (sheetError) {
-  console.error(sheetError)
-  alert('Could not load full portion sheet')
-} else {
-  setSheet(sheetData)
-}
+    console.log('SUPABASE DATA:', data)
+    console.log('SUPABASE ERROR:', error)
 
-    setLoading(false);
+    if (error) {
+      setErrorText(error.message)
+    } else {
+      setSheet(data)
+    }
+
+    setLoading(false)
   }
 
-  if (loading) return <main style={{ padding: '30px' }}>Loading sheet...</main>;
-  if (!sheet) return <main style={{ padding: '30px' }}>Sheet not found.</main>;
+  if (loading) return <main style={{ padding: 30 }}>Loading sheet...</main>
+
+  if (errorText) {
+    return (
+      <main style={{ padding: 30 }}>
+        <h1>Could not load full portion sheet</h1>
+        <p>{errorText}</p>
+        <p><strong>Sheet ID:</strong> {id}</p>
+      </main>
+    )
+  }
+
+  if (!sheet) {
+    return (
+      <main style={{ padding: 30 }}>
+        <h1>Sheet not found</h1>
+        <p><strong>Sheet ID:</strong> {id}</p>
+      </main>
+    )
+  }
 
   return (
-    <main style={{ padding: '30px' }}>
+    <main style={{ padding: 30 }}>
       <h1>Full Portion Sheet</h1>
 
+      <button onClick={() => window.print()}>Print</button>
+
+      <h2>Sheet Details</h2>
       <p><strong>Date:</strong> {sheet.sheet_date}</p>
-      <p><strong>Staff:</strong> {sheet.staff_name || '-'}</p>
-      <p><strong>Location:</strong> {sheet.location || '-'}</p>
-      <p><strong>Total Variance:</strong> {sheet.total_variance || 0}</p>
-      <p><strong>Notes:</strong> {sheet.notes || '-'}</p>
+      <p><strong>Stock Item:</strong> {sheet.stock_item}</p>
+      <p><strong>Prepared By:</strong> {sheet.prepared_by}</p>
+      <p><strong>Checked By:</strong> {sheet.checked_by}</p>
+      <p><strong>Status:</strong> {sheet.variance_status}</p>
 
-      <h2 style={{ marginTop: '30px' }}>Items</h2>
+      <h2>Variance Summary</h2>
+      <p><strong>Net Usable Weight:</strong> {Number(sheet.net_usable_weight || 0).toFixed(2)} kg</p>
+      <p><strong>Total Accounted Weight:</strong> {Number(sheet.total_accounted_weight || 0).toFixed(2)} kg</p>
+      <p><strong>True Variance:</strong> {Number(sheet.true_shortage_kg || 0).toFixed(2)} kg</p>
+      <p><strong>True Variance %:</strong> {Number(sheet.true_shortage_percent || 0).toFixed(2)}%</p>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <h2>Portion Summary</h2>
+      <table border={1} cellPadding={8}>
         <thead>
-          <tr style={{ background: '#f3f3f3' }}>
-            <th style={cell}>Code</th>
-            <th style={cell}>Item</th>
-            <th style={cell}>Opening</th>
-            <th style={cell}>Produced</th>
-            <th style={cell}>Used</th>
-            <th style={cell}>Closing</th>
-            <th style={cell}>Expected</th>
-            <th style={cell}>Actual</th>
-            <th style={cell}>Variance Qty</th>
-            <th style={cell}>Variance Value</th>
-            <th style={cell}>Issue</th>
+          <tr>
+            <th>SwiftPOS Stock Item</th>
+            <th>Portion Size</th>
+            <th>Total Qty</th>
+            <th>Total Weight kg</th>
           </tr>
         </thead>
-
         <tbody>
-
+          {(sheet.portion_summary || []).map((row: any, index: number) => (
+            <tr key={index}>
+              <td>{row.stockItemName}</td>
+              <td>{row.portionSize}g</td>
+              <td>{row.totalQty}</td>
+              <td>{Number(row.totalWeightKg || 0).toFixed(2)}</td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </main>
-  );
+  )
 }
-
-const cell = {
-  border: '1px solid #ddd',
-  padding: '10px',
-  textAlign: 'left' as const,
-};
