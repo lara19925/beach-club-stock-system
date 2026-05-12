@@ -29,7 +29,6 @@ type PortionLine = {
 
 export default function PortionSheetDetailPage({ params }: { params: { id: string } }) {
   const [sheet, setSheet] = useState<PortionSheet | null>(null);
-  const [lines, setLines] = useState<PortionLine[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -43,18 +42,12 @@ export default function PortionSheetDetailPage({ params }: { params: { id: strin
       .eq('id', params.id)
       .single();
 
-    const { data: lineData, error: lineError } = await supabase
-      .from('portion_sheet_lines')
-      .select('*')
-      .eq('sheet_id', params.id);
-
-    if (sheetError || lineError) {
-      console.error(sheetError || lineError);
-      alert('Could not load full portion sheet');
-    } else {
-      setSheet(sheetData);
-      setLines(lineData || []);
-    }
+    if (sheetError) {
+  console.error(sheetError)
+  alert('Could not load full portion sheet')
+} else {
+  setSheet(sheetData)
+}
 
     setLoading(false);
   }
@@ -92,21 +85,7 @@ export default function PortionSheetDetailPage({ params }: { params: { id: strin
         </thead>
 
         <tbody>
-          {lines.map((line) => (
-            <tr key={line.id}>
-              <td style={cell}>{line.item_code || '-'}</td>
-              <td style={cell}>{line.item_name || '-'}</td>
-              <td style={cell}>{line.opening_qty || 0}</td>
-              <td style={cell}>{line.produced_qty || 0}</td>
-              <td style={cell}>{line.used_qty || 0}</td>
-              <td style={cell}>{line.closing_qty || 0}</td>
-              <td style={cell}>{line.expected_qty || 0}</td>
-              <td style={cell}>{line.actual_qty || 0}</td>
-              <td style={cell}>{line.variance_qty || 0}</td>
-              <td style={cell}>{line.variance_value || 0}</td>
-              <td style={cell}>{line.issue_note || '-'}</td>
-            </tr>
-          ))}
+
         </tbody>
       </table>
     </main>
