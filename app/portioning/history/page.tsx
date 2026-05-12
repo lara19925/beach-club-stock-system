@@ -26,19 +26,23 @@ type PortionSheet = {
   portion_summary: any[] | null
 }
 
-export default function PortionSheetDetailPage({ params }: { params: { id: string } }) {
+import { useParams } from 'next/navigation'
+
+export default function PortionSheetDetailPage() {
+  const params = useParams()
+  const id = params.id as string
   const [sheet, setSheet] = useState<PortionSheet | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadSheet()
-  }, [])
+ useEffect(() => {
+  if (id) loadSheet()
+}, [id])
 
   async function loadSheet() {
     const { data, error } = await supabase
       .from('portion_sheets')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', id)
       .single()
 
     if (error) {
