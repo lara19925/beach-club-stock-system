@@ -12,6 +12,7 @@ interface PortionSummaryItem {
 interface SavedSheet {
   stockItem: string
   date: string
+  sheet_date?: string
   item?: string
   preparedBy: string
   checkedBy: string
@@ -81,7 +82,8 @@ export default function PortioningSummaryPage() {
 
   const filteredSheets = useMemo(() => {
     return savedSheets.filter(sheet => {
-      const dateOk = sheet.date >= startDate && sheet.date <= endDate
+    const sheetDate = sheet.sheet_date || sheet.date
+const dateOk = sheetDate >= startDate && sheetDate <= endDate
       const stockOk = stockFilter === 'All' || sheet.stockItem === stockFilter
       return dateOk && stockOk
     })
@@ -94,7 +96,7 @@ export default function PortioningSummaryPage() {
       if (!Array.isArray(sheet.portionSummaryByGramSize)) return
 
       sheet.portionSummaryByGramSize.forEach(row => {
-        const key = `${row.stockItemName}-${row.portionSize}`
+        const key = row.stockItemName || row.item || "Unknown Item"
 
         if (!grouped[key]) {
           grouped[key] = {
