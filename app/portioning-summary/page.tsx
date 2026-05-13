@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 
+import { supabase } from "@/lib/supabase"
+
 interface PortionSummaryItem {
   portionSize: number
   stockItemName: string
@@ -40,15 +42,43 @@ export default function PortioningSummaryPage() {
   const [currentStock, setCurrentStock] = useState<Record<string, number>>({})
 
   useEffect(() => {
-    const saved = localStorage.getItem('portionSheets')
-    if (saved) {
-      try {
-        setSavedSheets(JSON.parse(saved))
-      } catch {
-        setSavedSheets([])
-      }
+  async function loadSheets() {
+    const { data, error } = await supabase
+      .from("portion_sheets")
+      .select("*")
+      .order("sheet_date", { ascending: false })
+
+    if (error) {
+      console.error("Error loading portion sheets:", error)
+      setSavedSheets([])
+      return
     }
-  }, [])
+
+    const mappedSheets = (data || []).map((sheet: any) => ({
+      ...sheet,
+      date: sheet.sheet_date || sheet.created_at?.split("T")[0],
+      stockItem: sheet.stock_item || sheet.stockItem || sheet.item || "Unknown Item",
+      preparedBy: sheet.prepared_by || sheet.preparedBy || sheet.staff_name || "",
+      checkedBy: sheet.checked_by || sheet.checkedBy || "",
+      netUsableWeight: Number(sheet.net_usable_weight || sheet.netUsableWeight || 0),
+      totalAccountedWeight: Number(sheet.total_accounted_weight || sheet.totalAccountedWeight || 0),
+      trueShortageKg: Number(sheet.true_shortage_kg || sheet.trueShortageKg || 0),
+      totalShrinkageKg: Number(sheet.total_shrinkage_kg || sheet.totalShrinkageKg || 0),
+      trueShortagePercent: Number(sheet.true_shortage_percent || sheet.trueShortagePercent || 0),
+      acceptableVariancePercent: Number(sheet.acceptable_variance_percent || sheet.acceptableVariancePercent || 2),
+      varianceStatus: sheet.variance_status || sheet.varianceStatus || "",
+      portionSummaryByGramSize:
+        sheet.portion_summary_by_gram_size ||
+        sheet.portionSummaryByGramSize ||
+        sheet.portion_summary ||
+        [],
+    }))
+
+    setSavedSheets(mappedSheets)
+  }
+
+  loadSheets()
+}, [])
 
   useEffect(() => {
     const now = new Date()
