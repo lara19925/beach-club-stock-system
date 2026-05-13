@@ -123,29 +123,54 @@ const dateOk = sheetDate >= startDate && sheetDate <= endDate
   const groupedPortions = useMemo(() => {
     const grouped: Record<string, PortionSummaryItem> = {}
 
-    filteredSheets.forEach(sheet => {
-      if (!Array.isArray(sheet.portionSummaryByGramSize)) return
+filteredSheets.forEach(sheet => {
+  const rows =
+    Array.isArray(sheet.portionSummaryByGramSize) && sheet.portionSummaryByGramSize.length > 0
+      ? sheet.portionSummaryByGramSize
+      : Array.isArray((sheet as any).raw_rows)
+        ? (sheet as any).raw_rows
+        : []
 
-      sheet.portionSummaryByGramSize.forEach(row => {
-        const key = row.stockItemName || row.item || "Unknown Item"
+  if (!Array.isArray(rows) || rows.length === 0) return
 
-        if (!grouped[key]) {
-          grouped[key] = {
-            stockItemName: row.stockItemName,
-            portionSize: row.portionSize,
-            totalQty: 0,
-            totalWeightKg: 0,
-          }
-        }
+  rows.forEach((row: any) => {
+        const itemName = row.stockItemName || row.item || sheet.stockItem || "Unknown Item"
+const portionSize = Number(row.portionSize || row.portion_size || 0)
+const key = `${itemName}-${portionSize}`
 
-        grouped[key].totalQty += Number(row.totalQty) || 0
-        grouped[key].totalWeightKg += Number(row.totalWeightKg) || 0
+grouped[key] = {
+  stockItemName: itemName,
+  portionSize: portionSize,
+  totalQty: 0,
+  totalWeightKg: 0,
+}
+
+grouped[key] = {
+  stockItemName: itemName,
+  portionSize: portionSize,
+  totalQty: 0,
+  totalWeightKg: 0,
+}
+
+const qty = Number(
+  row.qtyProduced ??
+  row.totalQty ??
+  row.qty ??
+  row.quantity ??
+  row.portions ??
+  row.portionQty ??
+  row.totalPortions ??
+  0
+) || 0
+
+grouped[key].totalQty += qty
+grouped[key].totalWeightKg += (portionSize * qty) / 1000
       })
-    })
+})
 
     return Object.values(grouped).sort((a, b) =>
-      a.stockItemName.localeCompare(b.stockItemName)
-    )
+  (a.stockItemName || "Unknown Item").localeCompare(b.stockItemName || "Unknown Item")
+)
   }, [filteredSheets])
 
   const summary = {
