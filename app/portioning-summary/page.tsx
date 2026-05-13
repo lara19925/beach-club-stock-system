@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 interface PortionSummaryItem {
   portionSize: number
   stockItemName: string
+  item?: string
   totalQty: number
   totalWeightKg: number
 }
