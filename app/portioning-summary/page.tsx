@@ -94,7 +94,7 @@ export default function PortioningSummaryPage() {
       if (!Array.isArray(sheet.portionSummaryByGramSize)) return
 
       sheet.portionSummaryByGramSize.forEach(row => {
-        const key = row.stockItemName
+        const key = `${row.stockItemName}-${row.portionSize}`
 
         if (!grouped[key]) {
           grouped[key] = {
