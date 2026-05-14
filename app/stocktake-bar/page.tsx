@@ -1,36 +1,30 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
 interface Bottle {
-  id?: string
   plu_code: string
   item_name: string
   swiftpos_group: string
   count_type: string
-  bottle_size_ml: number
-  empty_bottle_weight_kg: number
   full_bottle_weight_kg: number
 }
 
-interface CountRow {
-  plu_code: string
-  item_name: string
-  swiftpos_group: string
-  count_type: string
-
+interface CountRow extends Bottle {
   sealed_qty: number
   open_weight_kg: number
   unit_qty: number
-
   total_weight_kg: number
 }
 
 export default function BarStocktakePage() {
-  const [bottles, setBottles] = useState<Bottle[]>([])
   const [rows, setRows] = useState<CountRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [stocktakeDate, setStocktakeDate] = useState(new Date().toISOString().split('T')[0])
+  const [countedBy, setCountedBy] = useState('')
+  const [notes, setNotes] = useState('')
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -39,247 +33,198 @@ export default function BarStocktakePage() {
   async function loadData() {
     setLoading(true)
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('bottle_master')
       .select('*')
       .eq('active', true)
       .order('item_name')
 
-    const mapped =
-      data?.map((item) => ({
+    if (error) {
+      alert(error.message)
+      setLoading(false)
+      return
+    }
+
+    setRows(
+      (data || []).map((item: any) => ({
         plu_code: item.plu_code,
         item_name: item.item_name,
         swiftpos_group: item.swiftpos_group,
         count_type: item.count_type || 'WEIGHT',
-
+        full_bottle_weight_kg: Number(item.full_bottle_weight_kg || 0),
         sealed_qty: 0,
         open_weight_kg: 0,
         unit_qty: 0,
-
         total_weight_kg: 0,
-      })) || []
-
-    setBottles(data || [])
-    setRows(mapped)
+      }))
+    )
 
     setLoading(false)
   }
 
-  function updateRow(
-    index: number,
-    field: string,
-    value: number
-  ) {
+  function updateRow(index: number, field: 'sealed_qty' | 'open_weight_kg' | 'unit_qty', value: number) {
     const updated = [...rows]
+    updated[index] = { ...updated[index], [field]: value }
 
-    updated[index] = {
-      ...updated[index],
-      [field]: value,
-    }
-
-    const bottle = bottles[index]
-
-    if (updated[index].count_type === 'WEIGHT') {
-      updated[index].total_weight_kg =
-        updated[index].open_weight_kg +
-        updated[index].sealed_qty *
-          bottle.full_bottle_weight_kg
+    if (updated[index].count_type === 'UNIT') {
+      updated[index].total_weight_kg = Number(updated[index].unit_qty || 0)
     } else {
       updated[index].total_weight_kg =
-        updated[index].unit_qty
+        Number(updated[index].sealed_qty || 0) * Number(updated[index].full_bottle_weight_kg || 0) +
+        Number(updated[index].open_weight_kg || 0)
     }
 
     setRows(updated)
   }
 
-  const filteredRows = useMemo(() => {
-    return rows
-  }, [rows])
+  async function saveStocktake(status: 'DRAFT' | 'FINAL') {
+    if (!countedBy.trim()) {
+      alert('Please enter counted by')
+      return
+    }
+
+    const countedRows = rows.filter((row) => Number(row.total_weight_kg || 0) > 0)
+
+    if (countedRows.length === 0) {
+      alert('No counted items to save')
+      return
+    }
+
+    setSaving(true)
+
+    const { data: session, error: sessionError } = await supabase
+      .from('bar_stocktake_sessions')
+      .insert([
+        {
+          stocktake_date: stocktakeDate,
+          location: 'Main Bar',
+          location_number: 2,
+          counted_by: countedBy,
+          status,
+          notes,
+        },
+      ])
+      .select()
+      .single()
+
+    if (sessionError) {
+      alert(sessionError.message)
+      setSaving(false)
+      return
+    }
+
+    const lines = countedRows.map((row) => ({
+      session_id: session.id,
+      plu_code: row.plu_code,
+      item_name: row.item_name,
+      swiftpos_group: row.swiftpos_group,
+      count_type: row.count_type,
+      sealed_qty: row.sealed_qty,
+      open_weight_kg: row.open_weight_kg,
+      unit_qty: row.unit_qty,
+      inventory_count: row.total_weight_kg,
+      location_number: 2,
+    }))
+
+    const { error: lineError } = await supabase
+      .from('bar_stocktake_lines')
+      .insert(lines)
+
+    setSaving(false)
+
+    if (lineError) {
+      alert(lineError.message)
+      return
+    }
+
+    alert(`Stocktake saved as ${status}`)
+  }
 
   function exportCSV() {
-    const locationNumber = 2
+    const headers = ['PLU_Number', 'InventoryCount', 'Location_Number']
 
-    const headers = [
-      'PLU_Number',
-      'InventoryCount',
-      'Location_Number',
-    ]
-
-    const csvRows = filteredRows
+    const csvRows = rows
       .filter((row) => Number(row.total_weight_kg || 0) > 0)
       .map((row) => [
         row.plu_code,
         row.total_weight_kg.toFixed(3),
-        locationNumber,
+        2,
       ])
 
     const csv = [
       headers.join(','),
-      ...csvRows.map((r) => r.join(',')),
+      ...csvRows.map((row) => row.join(',')),
     ].join('\n')
 
-    const blob = new Blob([csv], {
-      type: 'text/csv;charset=utf-8;',
-    })
-
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
-
     const link = document.createElement('a')
 
     link.href = url
     link.download = 'swiftpos-main-bar-count.csv'
-
     link.click()
 
     URL.revokeObjectURL(url)
   }
 
-  if (loading) {
-    return <div className="p-6">Loading...</div>
-  }
+  if (loading) return <div style={pageStyle}>Loading...</div>
 
   return (
-    <div className="p-6">
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 20,
-        }}
-      >
-        <h1 className="text-2xl font-bold">
-          Bar Stocktake
-        </h1>
+    <div style={pageStyle}>
+      <h1 style={headingStyle}>Bar Stocktake</h1>
 
-        <button
-          onClick={exportCSV}
-          style={{
-            background: '#2563eb',
-            color: '#fff',
-            border: 'none',
-            padding: '12px 20px',
-            borderRadius: 6,
-            cursor: 'pointer',
-          }}
-        >
-          Export SwiftPOS CSV
-        </button>
+      <div style={toolbarStyle}>
+        <input type="date" value={stocktakeDate} onChange={(e) => setStocktakeDate(e.target.value)} style={inputStyle} />
+        <input placeholder="Counted By" value={countedBy} onChange={(e) => setCountedBy(e.target.value)} style={inputStyle} />
+        <input placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} style={inputStyle} />
+
+        <button onClick={() => saveStocktake('DRAFT')} disabled={saving} style={buttonStyle}>Save Draft</button>
+        <button onClick={() => saveStocktake('FINAL')} disabled={saving} style={buttonStyle}>Finalize</button>
+        <button onClick={exportCSV} style={buttonStyle}>Export SwiftPOS CSV</button>
       </div>
 
-      <div
-        style={{
-          overflowX: 'auto',
-          background: '#fff',
-          borderRadius: 8,
-          padding: 20,
-        }}
-      >
-        <table
-          style={{
-            width: '100%',
-            borderCollapse: 'collapse',
-          }}
-        >
+      <div style={cardStyle}>
+        <table style={tableStyle}>
           <thead>
             <tr>
               <th style={thStyle}>PLU</th>
               <th style={thStyle}>Item</th>
               <th style={thStyle}>Group</th>
               <th style={thStyle}>Type</th>
-
               <th style={thStyle}>Sealed Qty</th>
               <th style={thStyle}>Open KG</th>
-
               <th style={thStyle}>Unit Qty</th>
-
               <th style={thStyle}>InventoryCount</th>
             </tr>
           </thead>
 
           <tbody>
-            {filteredRows.map((row, index) => (
-              <tr key={index}>
+            {rows.map((row, index) => (
+              <tr key={`${row.plu_code}-${index}`}>
+                <td style={tdStyle}>{row.plu_code}</td>
+                <td style={tdStyle}>{row.item_name}</td>
+                <td style={tdStyle}>{row.swiftpos_group}</td>
+                <td style={tdStyle}>{row.count_type}</td>
+
                 <td style={tdStyle}>
-                  {row.plu_code}
+                  {row.count_type === 'WEIGHT' ? (
+                    <input type="number" value={row.sealed_qty} onChange={(e) => updateRow(index, 'sealed_qty', Number(e.target.value))} style={smallInputStyle} />
+                  ) : '-'}
                 </td>
 
                 <td style={tdStyle}>
-                  {row.item_name}
+                  {row.count_type === 'WEIGHT' ? (
+                    <input type="number" step="0.001" value={row.open_weight_kg} onChange={(e) => updateRow(index, 'open_weight_kg', Number(e.target.value))} style={smallInputStyle} />
+                  ) : '-'}
                 </td>
 
                 <td style={tdStyle}>
-                  {row.swiftpos_group}
+                  {row.count_type === 'UNIT' ? (
+                    <input type="number" value={row.unit_qty} onChange={(e) => updateRow(index, 'unit_qty', Number(e.target.value))} style={smallInputStyle} />
+                  ) : '-'}
                 </td>
 
-                <td style={tdStyle}>
-                  {row.count_type}
-                </td>
-
-                <td style={tdStyle}>
-                  {row.count_type ===
-                  'WEIGHT' ? (
-                    <input
-                      type="number"
-                      value={row.sealed_qty}
-                      onChange={(e) =>
-                        updateRow(
-                          index,
-                          'sealed_qty',
-                          Number(e.target.value)
-                        )
-                      }
-                      style={inputStyle}
-                    />
-                  ) : (
-                    '-'
-                  )}
-                </td>
-
-                <td style={tdStyle}>
-                  {row.count_type ===
-                  'WEIGHT' ? (
-                    <input
-                      type="number"
-                      step="0.001"
-                      value={row.open_weight_kg}
-                      onChange={(e) =>
-                        updateRow(
-                          index,
-                          'open_weight_kg',
-                          Number(e.target.value)
-                        )
-                      }
-                      style={inputStyle}
-                    />
-                  ) : (
-                    '-'
-                  )}
-                </td>
-
-                <td style={tdStyle}>
-                  {row.count_type ===
-                  'UNIT' ? (
-                    <input
-                      type="number"
-                      value={row.unit_qty}
-                      onChange={(e) =>
-                        updateRow(
-                          index,
-                          'unit_qty',
-                          Number(e.target.value)
-                        )
-                      }
-                      style={inputStyle}
-                    />
-                  ) : (
-                    '-'
-                  )}
-                </td>
-
-                <td style={tdStyle}>
-                  {row.total_weight_kg.toFixed(3)}
-                </td>
+                <td style={tdStyle}><strong>{row.total_weight_kg.toFixed(3)}</strong></td>
               </tr>
             ))}
           </tbody>
@@ -289,38 +234,13 @@ export default function BarStocktakePage() {
   )
 }
 
-const thStyle = {
-  border: '1px solid #d1d5db',
-  padding: '12px',
-  background: '#0f172a',
-  color: '#ffffff',
-  textAlign: 'left' as const,
-  fontWeight: 600,
-  position: 'sticky' as const,
-  top: 0,
-  zIndex: 1,
-}
-
-const tdStyle = {
-  border: '1px solid #e5e7eb',
-  padding: '10px',
-  background: '#ffffff',
-  color: '#111827',
-}
-
-const inputStyle = {
-  width: '100%',
-  padding: '10px',
-  border: '1px solid #d1d5db',
-  borderRadius: '6px',
-  background: '#ffffff',
-  color: '#111827',
-  fontSize: '14px',
-}
-
-const cardStyle = {
-  background: '#ffffff',
-  borderRadius: '12px',
-  padding: '20px',
-  boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-}
+const pageStyle = { padding: 20, background: '#f3f4f6', minHeight: '100vh', color: '#111827' }
+const headingStyle = { fontSize: 28, fontWeight: '700', marginBottom: 20, color: '#111827' }
+const toolbarStyle = { display: 'flex', gap: 12, marginBottom: 20, alignItems: 'center', flexWrap: 'wrap' as const }
+const cardStyle = { background: '#ffffff', padding: 20, borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflowX: 'auto' as const }
+const inputStyle = { padding: 10, border: '1px solid #d1d5db', borderRadius: 6, background: '#ffffff', color: '#111827' }
+const smallInputStyle = { width: 100, padding: 8, border: '1px solid #d1d5db', borderRadius: 6, background: '#ffffff', color: '#111827' }
+const buttonStyle = { padding: '10px 16px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }
+const tableStyle = { width: '100%', borderCollapse: 'collapse' as const, background: '#ffffff' }
+const thStyle = { border: '1px solid #d1d5db', padding: 12, background: '#111827', color: '#ffffff', textAlign: 'left' as const }
+const tdStyle = { border: '1px solid #e5e7eb', padding: 10, color: '#111827' }
