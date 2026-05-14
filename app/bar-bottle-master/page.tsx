@@ -203,7 +203,7 @@ const { error } = await supabase
   .insert(newRows)
 
 if (error) {
-  alert('Error importing bottles')
+alert('Error importing bottles')
 console.error(error)
   return
 }
@@ -212,10 +212,6 @@ alert(
   `${newRows.length} imported, ${rows.length - newRows.length} skipped`
 )
 
-    if (error) {
-      alert(error.message)
-      return
-    }
 
     alert(`${rows.length} bottles imported`)
     loadItems()
