@@ -80,7 +80,7 @@ const rawDefaults: Record<string, PortionRow[]> = {
   ],
   'Wahoo Fish': [
     { item: 'Panfried Snapper', portionSize: 200, qtyProduced: 0 },
-    { item: 'Fish & Chips', portionSize: 100, qtyProduced: 0 },
+    { item: 'Fish & Chips', portionSize: 200, qtyProduced: 0 },
     { item: 'Sizzling Fish', portionSize: 200, qtyProduced: 0 },
   ],
   'Marlin Fish': [
