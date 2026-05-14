@@ -26,7 +26,6 @@ export default function RootLayout({
             <Link href="/history">History</Link>
             <Link href="/stocktake-bar">Bar Stocktake</Link>
             <Link href="/bar-bottle-master">Bottle Master</Link>
-<Link href="/bar-stocktake">Bar Bottle Count</Link>
             <Link href="/stocktake-kitchen">Kitchen Stocktake</Link>
             <Link href="/portioning">Portioning</Link>
             <Link href="/variance">Variance</Link>
