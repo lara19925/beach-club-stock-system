@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 
 interface BottleMaster {
   id?: string
+  count_type: string
   plu_code: string
   item_name: string
   bottle_size_ml: number
@@ -16,8 +17,9 @@ interface BottleMaster {
 
 const blankForm: BottleMaster = {
   plu_code: '',
+  count_type: 'WEIGHT',
   item_name: '',
-  bottle_size_ml: 700,
+  bottle_size_ml: 0,
   empty_bottle_weight_kg: 0,
   full_bottle_weight_kg: 0,
   swiftpos_group: '',
@@ -76,11 +78,13 @@ export default function BarBottleMasterPage() {
     setLoading(true)
 
     const payload = {
+            
       plu_code: form.plu_code,
+      count_type: form.count_type,
       item_name: form.item_name,
       bottle_size_ml: Number(form.bottle_size_ml),
-      empty_bottle_weight_kg: Number(form.empty_bottle_weight_kg),
-      full_bottle_weight_kg: Number(form.full_bottle_weight_kg),
+empty_bottle_weight_kg: form.count_type === 'UNIT' ? 0 : Number(form.empty_bottle_weight_kg),
+full_bottle_weight_kg: form.count_type === 'UNIT' ? 0 : Number(form.full_bottle_weight_kg),
       swiftpos_group: form.swiftpos_group,
       active: true,
     }
@@ -324,6 +328,27 @@ alert(
           }
           style={inputStyle}
         />
+<label>Count Type</label>
+
+<select
+  value={form.count_type}
+  onChange={(e) =>
+    setForm({
+      ...form,
+      count_type: e.target.value,
+    })
+  }
+  style={inputStyle}
+>
+  <option value="WEIGHT">
+    WEIGHT - Spirits/Open Bottles
+  </option>
+
+  <option value="UNIT">
+    UNIT - Beer/RTD/Soft Drinks
+  </option>
+</select>
+        
 
         <label>Bottle Size (ML)</label>
         <input
@@ -340,6 +365,8 @@ alert(
           style={inputStyle}
         />
 
+{form.count_type === 'WEIGHT' && (
+  <>
         <label>Empty Bottle Weight (KG)</label>
         <input
           type="number"
@@ -371,6 +398,8 @@ alert(
           }
           style={inputStyle}
         />
+          </>
+)}
 
         <button
           onClick={saveItem}
