@@ -203,7 +203,8 @@ const { error } = await supabase
   .insert(newRows)
 
 if (error) {
-  alert(error.message)
+  alert('Error importing bottles')
+console.error(error)
   return
 }
 
