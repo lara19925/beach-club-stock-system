@@ -191,20 +191,11 @@ const { data: existing } = await supabase
   .select('plu_code')
   .in('plu_code', pluCodes)
 
-const existingCodes = existing?.map((e) => e.plu_code) || []
-
-const newRows = rows.filter(
-  (r) => !existingCodes.includes(r.plu_code)
-)
-
-if (newRows.length === 0) {
-  alert('All items already exist')
-  return
-}
-
 const { error } = await supabase
   .from('bottle_master')
-  .insert(newRows)
+  .upsert(rows, {
+    onConflict: 'plu_code',
+  })
 
 if (error) {
 alert('Error importing bottles')
@@ -212,12 +203,8 @@ console.error(error)
   return
 }
 
-alert(
-  `${newRows.length} imported, ${rows.length - newRows.length} skipped`
-)
 
-
-    alert(`${rows.length} bottles imported`)
+    alert(`${rows.length} items imported or updated`)
     loadItems()
   }
 
