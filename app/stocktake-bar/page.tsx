@@ -26,6 +26,10 @@ export default function BarStocktakePage() {
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
 
+  const [search, setSearch] = useState('')
+const [groupFilter, setGroupFilter] = useState('ALL')
+const [typeFilter, setTypeFilter] = useState('ALL')
+
   useEffect(() => {
     loadData()
   }, [])
@@ -139,11 +143,29 @@ export default function BarStocktakePage() {
 
     alert(`Stocktake saved as ${status}`)
   }
+const filteredRows = rows.filter((row) => {
+  const matchesSearch =
+    row.item_name.toLowerCase().includes(search.toLowerCase()) ||
+    row.plu_code.toString().includes(search)
+
+  const matchesGroup =
+    groupFilter === 'ALL' || row.swiftpos_group === groupFilter
+
+  const matchesType =
+    typeFilter === 'ALL' || row.count_type === typeFilter
+
+  return matchesSearch && matchesGroup && matchesType
+})
+
+const groupOptions = [
+  'ALL',
+  ...Array.from(new Set(rows.map((row) => row.swiftpos_group).filter(Boolean))),
+]
 
   function exportCSV() {
     const headers = ['PLU_Number', 'InventoryCount', 'Location_Number']
 
-    const csvRows = rows
+    const csvRows = filteredRows
       .filter((row) => Number(row.total_weight_kg || 0) > 0)
       .map((row) => [
         row.plu_code,
@@ -184,7 +206,40 @@ export default function BarStocktakePage() {
       </div>
 
       <div style={cardStyle}>
-        <table style={tableStyle}>
+
+  <div style={filterStyle}>
+    <input
+      placeholder="Search item or PLU"
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+      style={inputStyle}
+    />
+
+    <select
+      value={groupFilter}
+      onChange={(e) => setGroupFilter(e.target.value)}
+      style={inputStyle}
+    >
+      {groupOptions.map((group) => (
+        <option key={group} value={group}>
+          {group === 'ALL' ? 'All Groups' : group}
+        </option>
+      ))}
+    </select>
+
+    <select
+      value={typeFilter}
+      onChange={(e) => setTypeFilter(e.target.value)}
+      style={inputStyle}
+    >
+      <option value="ALL">All Types</option>
+      <option value="WEIGHT">WEIGHT</option>
+      <option value="UNIT">UNIT</option>
+    </select>
+  </div>
+
+  <table style={tableStyle}>
+
           <thead>
             <tr>
               <th style={thStyle}>PLU</th>
@@ -199,7 +254,7 @@ export default function BarStocktakePage() {
           </thead>
 
           <tbody>
-            {rows.map((row, index) => (
+            {filteredRows.map((row, index) => (
               <tr key={`${row.plu_code}-${index}`}>
                 <td style={tdStyle}>{row.plu_code}</td>
                 <td style={tdStyle}>{row.item_name}</td>
@@ -244,3 +299,9 @@ const buttonStyle = { padding: '10px 16px', background: '#2563eb', color: '#ffff
 const tableStyle = { width: '100%', borderCollapse: 'collapse' as const, background: '#ffffff' }
 const thStyle = { border: '1px solid #d1d5db', padding: 12, background: '#111827', color: '#ffffff', textAlign: 'left' as const }
 const tdStyle = { border: '1px solid #e5e7eb', padding: 10, color: '#111827' }
+const filterStyle = {
+  display: 'grid',
+  gridTemplateColumns: '2fr 1fr 1fr',
+  gap: 12,
+  marginBottom: 20,
+}

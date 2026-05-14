@@ -1,5 +1,6 @@
-import './globals.css'
 import Link from 'next/link'
+import Image from 'next/image'
+import './globals.css'
 
 export default function RootLayout({
   children,
@@ -12,11 +13,43 @@ export default function RootLayout({
 
         {/* Sidebar */}
         <div className="w-64 h-screen bg-gray-900 text-white p-4">
-          <h2 className="text-lg font-semibold mb-6 leading-tight">
-  The Beach Club Wailoaloa
-  <br />
-  <span className="block mt-2">Stock System</span>
-</h2>
+<div
+  style={{
+    padding: '32px 20px 28px 20px',
+    textAlign: 'center',
+    borderBottom: '1px solid rgba(255,255,255,0.12)',
+    marginBottom: '24px',
+  }}
+>
+  <Image
+    src="/logo.png"
+    alt="The Beach Club Wailoaloa Logo"
+    width={280}
+    height={280}
+    style={{
+      width: '210px',
+      height: 'auto',
+      margin: '0 auto 18px auto',
+      objectFit: 'contain',
+    }}
+    priority
+  />
+
+  <div
+    style={{
+      color: '#ffffff',
+      fontSize: '30px',
+      fontWeight: 800,
+      lineHeight: 1.1,
+      letterSpacing: '-0.5px',
+      fontFamily: 'Inter, Arial, sans-serif',
+    }}
+  >
+    Stock
+    <br />
+    System
+  </div>
+</div>
 
           <nav className="flex flex-col gap-3 text-sm">
             <Link href="/dashboard">Dashboard</Link>
