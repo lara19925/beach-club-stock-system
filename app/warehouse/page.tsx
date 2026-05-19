@@ -118,44 +118,56 @@ const [savingReport, setSavingReport] = useState(false)
             ) || 0
 
         const transfersIn =
-          transfers
-            ?.filter(
-              (line: any) =>
-                String(line.plu_code).trim() === plu &&
-                line.transfer_type === 'IN'
-            )
-            .reduce(
-              (sum: number, line: any) => sum + Number(line.qty || 0),
-              0
-            ) || 0
+  transfers
+    ?.filter(
+      (line: any) =>
+        String(line.plu_code).trim() === plu &&
+        line.to_location === 'Main Bar'
+    )
+    .reduce(
+      (sum: number, line: any) => sum + Number(line.qty || 0),
+      0
+    ) || 0
 
         const transfersOut =
-          transfers
-            ?.filter(
-              (line: any) =>
-                String(line.plu_code).trim() === plu &&
-                line.transfer_type === 'OUT'
-            )
-            .reduce(
-              (sum: number, line: any) => sum + Number(line.qty || 0),
-              0
-            ) || 0
+  transfers
+    ?.filter(
+      (line: any) =>
+        String(line.plu_code).trim() === plu &&
+        line.from_location === 'Main Bar'
+    )
+    .reduce(
+      (sum: number, line: any) => sum + Number(line.qty || 0),
+      0
+    ) || 0
 
-        const expected = opening + transfersIn - transfersOut - sold
-        const variance = physical - expected
+       const isOpeningCount = !previousSession?.id
+
+const adjustedOpening = isOpeningCount ? physical : opening
+const adjustedSold = isOpeningCount ? 0 : sold
+const adjustedTransfersIn = isOpeningCount ? 0 : transfersIn
+const adjustedTransfersOut = isOpeningCount ? 0 : transfersOut
+
+const expected =
+  adjustedOpening +
+  adjustedTransfersIn -
+  adjustedTransfersOut -
+  adjustedSold
+
+const variance = physical - expected
 
         return {
-          plu_code: plu,
-          item_name: item.item_name || '',
-          group_name: item.swiftpos_group || 'NO GROUP',
-          opening,
-          transfers_in: transfersIn,
-          transfers_out: transfersOut,
-          sold,
-          expected,
-          physical,
-          variance,
-        }
+  plu_code: plu,
+  item_name: item.item_name,
+  group_name: item.swiftpos_group,
+  opening: adjustedOpening,
+  transfers_in: adjustedTransfersIn,
+  transfers_out: adjustedTransfersOut,
+  sold: adjustedSold,
+  expected,
+  physical,
+  variance,
+}
       }) || []
 
     setRows(reportRows)
