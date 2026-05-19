@@ -237,7 +237,7 @@ export default function WarehousePage() {
     const link = document.createElement('a')
 
     link.href = url
-    link.download = `bar-unit-variance-${date}.csv`
+    link.download = `bar-variance-report-${date}.csv`
     link.click()
 
     URL.revokeObjectURL(url)
@@ -245,7 +245,7 @@ export default function WarehousePage() {
 
   return (
     <div style={pageStyle}>
-      <h1 style={headingStyle}>Bar Unit Variance</h1>
+      <h1 style={headingStyle}>Bar Variance Report</h1>
 
       <div style={cardStyle}>
         <div style={toolbarStyle}>
@@ -376,7 +376,7 @@ export default function WarehousePage() {
             {filteredRows.length === 0 && (
               <tr>
                 <td style={tdStyle} colSpan={11}>
-                  Generate report to view bar unit variance.
+                  Generate report to view the bar variance report.
                 </td>
               </tr>
             )}

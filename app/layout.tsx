@@ -55,7 +55,7 @@ export default function RootLayout({
             <Link href="/dashboard">Dashboard</Link>
             <Link href="/items">Items</Link>
             <Link href="/suppliers">Suppliers</Link>
-            <Link href="/warehouse">Warehouse</Link>
+            <Link href="/warehouse">Bar Variance Report</Link>
             <Link href="/history">History</Link>
             <Link href="/stocktake-bar">Bar Stocktake</Link>
             <Link href="/bar-bottle-master">Bottle Master</Link>
