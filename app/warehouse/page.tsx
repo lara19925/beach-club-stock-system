@@ -91,7 +91,14 @@ const [savingReport, setSavingReport] = useState(false)
       items?.map((item: any) => {
         const plu = String(item.plu_code || '').trim()
 
-        const opening = 0
+        const opening =
+  openingLines
+    ?.filter((line: any) => String(line.plu_code).trim() === plu)
+    .reduce(
+      (sum: number, line: any) =>
+        sum + Number(line.inventory_count || 0),
+      0
+    ) || 0
 
         const physical =
           currentLines
