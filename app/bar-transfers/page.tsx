@@ -19,6 +19,7 @@ interface TransferRow {
   qty: number
   from_location: string
   to_location: string
+  transfer_type: string
   notes: string
   created_by: string
   created_at?: string
@@ -31,6 +32,7 @@ const blankForm: TransferRow = {
   qty: 0,
   from_location: 'Warehouse',
   to_location: 'Main Bar',
+  transfer_type: 'TRANSFER',
   notes: '',
   created_by: '',
 }
@@ -38,13 +40,14 @@ const blankForm: TransferRow = {
 export default function BarTransfersPage() {
   const [items, setItems] = useState<BarItem[]>([])
   const [transfers, setTransfers] = useState<TransferRow[]>([])
-  const [form, setForm] = useState<TransferRow>(blankForm)
   const [saving, setSaving] = useState(false)
 
   const [search, setSearch] = useState('')
   const [dateFilter, setDateFilter] = useState(
     new Date().toISOString().split('T')[0]
   )
+
+  const [form, setForm] = useState<TransferRow>(blankForm)
 
   useEffect(() => {
     loadItems()
@@ -54,7 +57,7 @@ export default function BarTransfersPage() {
   async function loadItems() {
     const { data, error } = await supabase
       .from('bottle_master')
-      .select('id, plu_code, item_name, swiftpos_group, count_type')
+      .select('*')
       .eq('active', true)
       .eq('count_type', 'UNIT')
       .order('item_name')
@@ -83,33 +86,31 @@ export default function BarTransfersPage() {
   }
 
   const filteredItems = useMemo(() => {
-    const searchText = search.toLowerCase().trim()
+    const s = search.toLowerCase()
 
-    if (!searchText) return items
+    if (!s) return items
 
     return items.filter(
       (item) =>
-        item.item_name.toLowerCase().includes(searchText) ||
-        item.plu_code.toLowerCase().includes(searchText) ||
-        item.swiftpos_group.toLowerCase().includes(searchText)
+        item.item_name.toLowerCase().includes(s) ||
+        item.plu_code.toLowerCase().includes(s) ||
+        item.swiftpos_group?.toLowerCase().includes(s)
     )
   }, [items, search])
 
   const filteredTransfers = useMemo(() => {
     return transfers.filter((transfer) => {
-      const dateOk =
+      const dateMatch =
         !dateFilter || transfer.transfer_date === dateFilter
 
-      const searchText = search.toLowerCase().trim()
+      const s = search.toLowerCase()
 
-      const searchOk =
-        !searchText ||
-        transfer.item_name.toLowerCase().includes(searchText) ||
-        transfer.plu_code.toLowerCase().includes(searchText) ||
-        transfer.from_location.toLowerCase().includes(searchText) ||
-        transfer.to_location.toLowerCase().includes(searchText)
+      const searchMatch =
+        !s ||
+        transfer.item_name?.toLowerCase().includes(s) ||
+        transfer.plu_code?.toLowerCase().includes(s)
 
-      return dateOk && searchOk
+      return dateMatch && searchMatch
     })
   }, [transfers, dateFilter, search])
 
@@ -124,33 +125,18 @@ export default function BarTransfersPage() {
   }
 
   async function saveTransfer() {
-    if (!form.transfer_date) {
-      alert('Transfer date is required')
-      return
-    }
-
     if (!form.plu_code) {
       alert('Select an item')
       return
     }
 
     if (!form.qty || Number(form.qty) <= 0) {
-      alert('Enter a valid quantity')
-      return
-    }
-
-    if (!form.from_location.trim()) {
-      alert('From location is required')
-      return
-    }
-
-    if (!form.to_location.trim()) {
-      alert('To location is required')
+      alert('Enter quantity')
       return
     }
 
     if (!form.created_by.trim()) {
-      alert('Created by is required')
+      alert('Enter created by')
       return
     }
 
@@ -162,10 +148,11 @@ export default function BarTransfersPage() {
         plu_code: form.plu_code,
         item_name: form.item_name,
         qty: Number(form.qty),
-        from_location: form.from_location.trim(),
-        to_location: form.to_location.trim(),
-        notes: form.notes.trim(),
-        created_by: form.created_by.trim(),
+        from_location: form.from_location,
+        to_location: form.to_location,
+        transfer_type: 'TRANSFER',
+        notes: form.notes,
+        created_by: form.created_by,
       },
     ])
 
@@ -182,8 +169,6 @@ export default function BarTransfersPage() {
       ...blankForm,
       transfer_date: form.transfer_date,
       created_by: form.created_by,
-      from_location: form.from_location,
-      to_location: form.to_location,
     })
 
     loadTransfers()
@@ -192,7 +177,8 @@ export default function BarTransfersPage() {
   async function deleteTransfer(id?: string) {
     if (!id) return
 
-    const confirmed = confirm('Delete this transfer?')
+    const confirmed = confirm('Delete transfer?')
+
     if (!confirmed) return
 
     const { error } = await supabase
@@ -214,13 +200,13 @@ export default function BarTransfersPage() {
       'PLU',
       'Item',
       'Qty',
-      'From Location',
-      'To Location',
+      'From',
+      'To',
       'Created By',
       'Notes',
     ]
 
-    const csvRows = filteredTransfers.map((row) => [
+    const rows = filteredTransfers.map((row) => [
       row.transfer_date,
       row.plu_code,
       row.item_name,
@@ -233,10 +219,8 @@ export default function BarTransfersPage() {
 
     const csv = [
       headers.join(','),
-      ...csvRows.map((row) =>
-        row
-          .map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`)
-          .join(',')
+      ...rows.map((row) =>
+        row.map((v) => `"${String(v ?? '')}"`).join(',')
       ),
     ].join('\n')
 
@@ -245,10 +229,10 @@ export default function BarTransfersPage() {
     })
 
     const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
 
+    const link = document.createElement('a')
     link.href = url
-    link.download = `bar-transfers-${dateFilter || 'all'}.csv`
+    link.download = 'bar-transfers.csv'
     link.click()
 
     URL.revokeObjectURL(url)
@@ -261,14 +245,17 @@ export default function BarTransfersPage() {
       <div style={cardStyle}>
         <h2 style={subheadingStyle}>Add Transfer</h2>
 
-        <div style={formGridStyle}>
+        <div style={gridStyle}>
           <div>
             <label style={labelStyle}>Date</label>
             <input
               type="date"
               value={form.transfer_date}
               onChange={(e) =>
-                setForm({ ...form, transfer_date: e.target.value })
+                setForm({
+                  ...form,
+                  transfer_date: e.target.value,
+                })
               }
               style={inputStyle}
             />
@@ -277,7 +264,7 @@ export default function BarTransfersPage() {
           <div>
             <label style={labelStyle}>Search Item</label>
             <input
-              placeholder="Search item, PLU, or group"
+              placeholder="Search item or PLU"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               style={inputStyle}
@@ -291,7 +278,8 @@ export default function BarTransfersPage() {
               onChange={(e) => selectItem(e.target.value)}
               style={inputStyle}
             >
-              <option value="">Select item</option>
+              <option value="">Select Item</option>
+
               {filteredItems.map((item) => (
                 <option key={item.plu_code} value={item.plu_code}>
                   {item.item_name} ({item.plu_code})
@@ -307,7 +295,10 @@ export default function BarTransfersPage() {
               min="0"
               value={form.qty}
               onChange={(e) =>
-                setForm({ ...form, qty: Number(e.target.value) })
+                setForm({
+                  ...form,
+                  qty: Number(e.target.value),
+                })
               }
               style={inputStyle}
             />
@@ -318,14 +309,17 @@ export default function BarTransfersPage() {
             <select
               value={form.from_location}
               onChange={(e) =>
-                setForm({ ...form, from_location: e.target.value })
+                setForm({
+                  ...form,
+                  from_location: e.target.value,
+                })
               }
               style={inputStyle}
             >
-              <option value="Warehouse">Warehouse</option>
-              <option value="Main Bar">Main Bar</option>
-              <option value="Kitchen 1">Kitchen 1</option>
-              <option value="Kitchen 2">Kitchen 2</option>
+              <option>Warehouse</option>
+              <option>Main Bar</option>
+              <option>Kitchen 1</option>
+              <option>Kitchen 2</option>
             </select>
           </div>
 
@@ -334,14 +328,17 @@ export default function BarTransfersPage() {
             <select
               value={form.to_location}
               onChange={(e) =>
-                setForm({ ...form, to_location: e.target.value })
+                setForm({
+                  ...form,
+                  to_location: e.target.value,
+                })
               }
               style={inputStyle}
             >
-              <option value="Main Bar">Main Bar</option>
-              <option value="Warehouse">Warehouse</option>
-              <option value="Kitchen 1">Kitchen 1</option>
-              <option value="Kitchen 2">Kitchen 2</option>
+              <option>Main Bar</option>
+              <option>Warehouse</option>
+              <option>Kitchen 1</option>
+              <option>Kitchen 2</option>
             </select>
           </div>
 
@@ -350,7 +347,10 @@ export default function BarTransfersPage() {
             <input
               value={form.created_by}
               onChange={(e) =>
-                setForm({ ...form, created_by: e.target.value })
+                setForm({
+                  ...form,
+                  created_by: e.target.value,
+                })
               }
               style={inputStyle}
             />
@@ -361,7 +361,10 @@ export default function BarTransfersPage() {
             <input
               value={form.notes}
               onChange={(e) =>
-                setForm({ ...form, notes: e.target.value })
+                setForm({
+                  ...form,
+                  notes: e.target.value,
+                })
               }
               style={inputStyle}
             />
@@ -378,15 +381,15 @@ export default function BarTransfersPage() {
       </div>
 
       <div style={cardStyle}>
-        <div style={topRowStyle}>
+        <div style={topBarStyle}>
           <h2 style={subheadingStyle}>Transfer History</h2>
 
-          <button onClick={exportCSV} style={secondaryButtonStyle}>
+          <button onClick={exportCSV} style={darkButtonStyle}>
             Export CSV
           </button>
         </div>
 
-        <div style={filterGridStyle}>
+        <div style={filterStyle}>
           <input
             type="date"
             value={dateFilter}
@@ -395,14 +398,14 @@ export default function BarTransfersPage() {
           />
 
           <input
-            placeholder="Search transfer history"
+            placeholder="Search transfers"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={inputStyle}
           />
         </div>
 
-        <div style={resultBarStyle}>
+        <div style={{ marginBottom: 12 }}>
           Showing {filteredTransfers.length} of {transfers.length} transfers
         </div>
 
@@ -417,7 +420,7 @@ export default function BarTransfersPage() {
               <th style={thStyle}>To</th>
               <th style={thStyle}>Created By</th>
               <th style={thStyle}>Notes</th>
-              <th style={thStyle}>Actions</th>
+              <th style={thStyle}>Action</th>
             </tr>
           </thead>
 
@@ -432,10 +435,11 @@ export default function BarTransfersPage() {
                 <td style={tdStyle}>{transfer.to_location}</td>
                 <td style={tdStyle}>{transfer.created_by}</td>
                 <td style={tdStyle}>{transfer.notes}</td>
+
                 <td style={tdStyle}>
                   <button
                     onClick={() => deleteTransfer(transfer.id)}
-                    style={dangerButtonStyle}
+                    style={deleteButtonStyle}
                   >
                     Delete
                   </button>
@@ -445,7 +449,7 @@ export default function BarTransfersPage() {
 
             {filteredTransfers.length === 0 && (
               <tr>
-                <td style={tdStyle} colSpan={9}>
+                <td colSpan={9} style={tdStyle}>
                   No transfers found.
                 </td>
               </tr>
@@ -459,90 +463,79 @@ export default function BarTransfersPage() {
 
 const pageStyle = {
   padding: 20,
-  background: '#f3f4f6',
-  minHeight: '100vh',
-  color: '#111827',
 }
 
 const headingStyle = {
-  fontSize: 28,
-  fontWeight: '700',
+  fontSize: 40,
+  fontWeight: 700,
   marginBottom: 20,
 }
 
 const subheadingStyle = {
-  fontSize: 22,
-  fontWeight: '700',
-  margin: 0,
-  marginBottom: 16,
+  fontSize: 30,
+  fontWeight: 700,
 }
 
 const cardStyle = {
   background: '#ffffff',
   padding: 20,
   borderRadius: 12,
-  boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
   marginBottom: 20,
-  overflowX: 'auto' as const,
 }
 
-const formGridStyle = {
+const gridStyle = {
   display: 'grid',
   gridTemplateColumns: 'repeat(4, 1fr)',
-  gap: 12,
-  marginBottom: 16,
+  gap: 16,
+  marginBottom: 20,
 }
 
-const filterGridStyle = {
+const filterStyle = {
   display: 'grid',
   gridTemplateColumns: '1fr 2fr',
   gap: 12,
-  marginBottom: 12,
+  marginBottom: 16,
 }
 
-const topRowStyle = {
+const topBarStyle = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
-  marginBottom: 16,
 }
 
 const labelStyle = {
   display: 'block',
-  fontWeight: 600,
   marginBottom: 6,
+  fontWeight: 600,
 }
 
 const inputStyle = {
   width: '100%',
-  padding: 10,
+  padding: 12,
+  borderRadius: 8,
   border: '1px solid #d1d5db',
-  borderRadius: 6,
-  background: '#ffffff',
-  color: '#111827',
 }
 
 const buttonStyle = {
-  padding: '10px 16px',
+  padding: '12px 18px',
   background: '#2563eb',
   color: '#ffffff',
   border: 'none',
-  borderRadius: 6,
+  borderRadius: 8,
   cursor: 'pointer',
   fontWeight: 600,
 }
 
-const secondaryButtonStyle = {
-  padding: '10px 16px',
+const darkButtonStyle = {
+  padding: '12px 18px',
   background: '#111827',
   color: '#ffffff',
   border: 'none',
-  borderRadius: 6,
+  borderRadius: 8,
   cursor: 'pointer',
-  fontWeight: 600,
 }
 
-const dangerButtonStyle = {
+const deleteButtonStyle = {
   padding: '8px 12px',
   background: '#dc2626',
   color: '#ffffff',
@@ -551,26 +544,19 @@ const dangerButtonStyle = {
   cursor: 'pointer',
 }
 
-const resultBarStyle = {
-  marginBottom: 12,
-  fontSize: 14,
-  color: '#6b7280',
-}
-
 const tableStyle = {
   width: '100%',
   borderCollapse: 'collapse' as const,
 }
 
 const thStyle = {
-  border: '1px solid #d1d5db',
-  padding: 12,
   background: '#111827',
   color: '#ffffff',
+  padding: 12,
   textAlign: 'left' as const,
 }
 
 const tdStyle = {
-  border: '1px solid #e5e7eb',
-  padding: 10,
+  borderBottom: '1px solid #e5e7eb',
+  padding: 12,
 }
